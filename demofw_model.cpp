@@ -54,6 +54,11 @@ bool Model::process_scene(const aiScene* scene){
 			vertex_data.push_back(scene->mMeshes[i]->mVertices[j].x);
 			vertex_data.push_back(scene->mMeshes[i]->mVertices[j].y);
 			vertex_data.push_back(scene->mMeshes[i]->mVertices[j].z);
+			/* Assume that all models have vertex normals */
+			assert(scene->mMeshes[i]->HasNormals());
+			vertex_normals.push_back(scene->mMeshes[i]->mNormals[j].x);
+			vertex_normals.push_back(scene->mMeshes[i]->mNormals[j].y);
+			vertex_normals.push_back(scene->mMeshes[i]->mNormals[j].z);
 		}
 		for(unsigned int j=0; j<scene->mMeshes[i]->mNumFaces;j++){
 			/* Check that we only have triangles. */
@@ -70,11 +75,11 @@ bool Model::process_scene(const aiScene* scene){
 }
 
 void Model::bind_buffers(){
-	GLuint buffers[2];
-	glGenBuffers(2, buffers);
-	assert(glGetError()==GL_NO_ERROR);
+	GLuint buffers[3];
+	glGenBuffers(3, buffers);
 	vbo_handle = buffers[0];
 	ebo_handle = buffers[1];
+	vbo_normals_handle = buffers[2];
 
 	/* Store vertex data */
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
@@ -86,19 +91,31 @@ void Model::bind_buffers(){
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
 			vertex_indices.size() * sizeof(GLushort),
 			vertex_indices.data(), GL_STATIC_DRAW);
+	/* Store vertex normals */
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_normals_handle);
+	glBufferData(GL_ARRAY_BUFFER, vertex_normals.size() * sizeof(GLfloat),
+			vertex_normals.data(),
+			GL_STATIC_DRAW);
+
 
 	assert(glGetError()==GL_NO_ERROR);
 }
 
 void Model::render(){
-	/* REVISIT: Assumes that the location of vertex position is 0. */
-	assert(glGetError()==GL_NO_ERROR);
+	GLuint vposition_loc = glGetAttribLocation(program.handle, "vertex_position");
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,0,0);
-	glEnableVertexAttribArray(0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_handle);
-	glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, NULL);
+	glVertexAttribPointer(vposition_loc, 3, GL_FLOAT, GL_FALSE,0,0);
+	glEnableVertexAttribArray(vposition_loc);
 
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_normals_handle);
+	GLuint vnormals_loc = glGetAttribLocation(program.handle, "vertex_normal");
+	glEnableVertexAttribArray(vnormals_loc);
+	glVertexAttribPointer(vnormals_loc, 3, GL_FLOAT, GL_FALSE,0,0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_handle);
+
+	assert(glGetError()==GL_NO_ERROR);
+	glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, NULL);
 }
 
 void Model::print_vertex_data(){
